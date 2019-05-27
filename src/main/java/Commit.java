@@ -24,4 +24,20 @@ public class Commit {
         }
         changedComponents.put(component, changedLines);
     }
+
+    public String getCommitId(){
+        return commitId;
+    }
+
+    public int getCommitIndex(){
+        return commitIndex;
+    }
+
+    public void setAuthor(String author){
+        this.author = author;
+    }
+
+    public String getAuthor(){
+        return author;
+    }
 }

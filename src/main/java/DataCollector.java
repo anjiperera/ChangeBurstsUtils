@@ -11,6 +11,7 @@ public class DataCollector {
     final static int INDEX_COMMIT_ID = 1;
     final static int INDEX_CLASS_NAME = 2;
     final static int INDEX_CHANGED_LINES = 3;
+    final static int INDEX_AUTHOR = 2;
 
     final static String FILE_RENAME_COMMIT_ID = "fc5c081e22a61bb5a6810af302be3f22f7966df4";
 
@@ -21,8 +22,10 @@ public class DataCollector {
         commits = new HashMap<Integer, Commit>();
         components = new HashMap<String, Component>();
         importCommitStats();
+        importCommitAuthors();
 
-        printAllComponents();
+        //printAllComponents();
+        printAllCommits();
     }
 
     private static void importCommitStats() {
@@ -77,6 +80,36 @@ public class DataCollector {
         }
     }
 
+    //This method should be called after calling importCommitStats()
+    private static void importCommitAuthors(){
+        try {
+            FileReader fileReader = new FileReader("C:\\Research\\Defects4J_Projects\\Utils\\lang\\commit_authors.csv");
+            CSVReader csvReader = new CSVReader(fileReader);
+            String[] nextRecord;
+
+            while ((nextRecord = csvReader.readNext()) != null) {
+                int commitIndex = Integer.parseInt(nextRecord[INDEX_COMMIT_INDEX]);
+                String commitId = nextRecord[INDEX_COMMIT_ID];
+                commitId = commitId.split("\n")[0];
+                String author = nextRecord[INDEX_AUTHOR];
+
+                if(!commits.containsKey(commitIndex)){
+                    throw new RuntimeException("Unknown Commit. Commit Index: " + commitIndex + " Commit ID: " + commitId);
+                }
+
+                Commit commit = commits.get(commitIndex);
+                if(!commitId.equals(commit.getCommitId())){
+                    throw new RuntimeException("Commit Index does not match with Commit ID. Commit Index: " +
+                            commitIndex + " Commit ID: " + commitId);
+                }
+
+                commit.setAuthor(author);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     private static boolean checkForUndefinedPackages(String className) {
         if (className.contains("src/pending/")) {
             return true;
@@ -96,6 +129,13 @@ public class DataCollector {
     private static void printAllComponents() {
         for (Component component : components.values()) {
             System.out.println(component.getName());
+        }
+    }
+
+    private static void printAllCommits(){
+        System.out.println("Total Commits: " + commits.size());
+        for(Commit commit: commits.values()){
+            System.out.println(commit.getCommitIndex() + " : " + commit.getCommitId() + " : " + commit.getAuthor());
         }
     }
 }
