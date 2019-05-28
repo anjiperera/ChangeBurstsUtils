@@ -1,13 +1,14 @@
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Stack;
+import java.util.*;
 
 import static java.lang.Boolean.FALSE;
 import static java.lang.Boolean.TRUE;
 
 public class MetricsExtractor {
+    private static final Integer INDEX_NON_CHANGE = 0;
+    private static final Integer INDEX_NORMAL_BURST = 1;
     private static final Integer INDEX_START_BURST = 2;
     private static final Integer INDEX_END_BURST = 3;
+    private static final Integer INDEX_NON_BURST_CHANGE = 4;
     public static int GAP_SIZE = 1;
     public static int BURST_SIZE = 1;
     public static int SNAPSHOT_GAP = 450;
@@ -40,20 +41,17 @@ public class MetricsExtractor {
     final static int INDEX_MCIB = 23;
 
     public static List<List<Integer>> extractMetrics(List<Boolean> changedSequence){
-        //List<Integer> metricsOf = new ArrayList<>();
         List<List<Integer>> metrics = new ArrayList<>();
         int[] changeBurstsValues;
 
         for(int snapshot = 0; snapshot < TOTAL_SNAPSHOTS; snapshot++){
-            changeBurstsValues = calculateChangeBursts(changedSequence, snapshot*SNAPSHOT_GAP,
-                    snapshot*SNAPSHOT_GAP + SNAPSHOT_GAP - 1);
-
             List<Integer> metricsOfSnapshot = new ArrayList<>();
 
-            metricsOfSnapshot.add(INDEX_NOC, changeBurstsValues[0]);
-            metricsOfSnapshot.add(INDEX_NOCB, changeBurstsValues[1]);
-            metricsOfSnapshot.add(INDEX_TBS, changeBurstsValues[2]);
-            metricsOfSnapshot.add(INDEX_MCB, changeBurstsValues[3]);
+            List<Integer> changeBursts = getChangeBursts(changedSequence, snapshot*SNAPSHOT_GAP,
+                    snapshot*SNAPSHOT_GAP + SNAPSHOT_GAP - 1);
+            calculateChangeMetrics(changeBursts, metricsOfSnapshot);
+            calculateTimeMetrics(changeBursts, metricsOfSnapshot);
+
 
             int originalBurstSize = BURST_SIZE;
 
@@ -164,21 +162,25 @@ public class MetricsExtractor {
 
     /*
         If the BURST_SIZE = 1 and then the smallest burst will be like {INDEX_END_BURST}
+        changedSequence[endIndex - startIndex + 1] carries the numberOfChanges
     */
     private static List<Integer> getChangeBursts(List<Boolean> changedSequence, int startIndex, int endIndex){
         int changeCount = 0;
         boolean isBurst = false;
         int lastChangedIndex = 0;
+        int numberOfChanges = 0;
 
         List<Integer> changeBursts = new ArrayList<>();
         for(int index = 0; index <= endIndex -startIndex; index++){
-            changeBursts.add(index, 0);
+            changeBursts.add(index, INDEX_NON_CHANGE);
         }
 
         Stack<Integer> tempBurst = new Stack<>();
         for(int index = startIndex; index <= endIndex; index++){
 
             if(changedSequence.get(index) == TRUE){
+                numberOfChanges++;
+                changeBursts.add(index - startIndex, INDEX_NON_BURST_CHANGE);
                 lastChangedIndex = index;
 
                 if(!isBurst) {
@@ -190,7 +192,7 @@ public class MetricsExtractor {
                         assert tempBurst.empty();
                     }
                 } else {
-                    changeBursts.add(index - startIndex, 1);
+                    changeBursts.add(index - startIndex, INDEX_NORMAL_BURST);
                 }
 
             } else {
@@ -214,6 +216,7 @@ public class MetricsExtractor {
             changeBursts.add(lastChangedIndex - startIndex, INDEX_END_BURST);
         }
 
+        changeBursts.add(endIndex - startIndex + 1, numberOfChanges);
         return changeBursts;
     }
 
@@ -222,9 +225,125 @@ public class MetricsExtractor {
             if(tempBurst.size() == 1){
                 changeBursts.add(tempBurst.pop(), INDEX_START_BURST);
             } else {
-                changeBursts.add(tempBurst.pop(), 1);
+                changeBursts.add(tempBurst.pop(), INDEX_NORMAL_BURST);
             }
         }
+    }
+
+    private static void calculateChangeMetrics(List<Integer> changeBursts, List<Integer> metrics){
+        int totalPoints = changeBursts.size();
+        metrics.add(INDEX_NOC, changeBursts.get(totalPoints - 1));
+        changeBursts.remove(totalPoints - 1);
+
+        int numberOfChangeBursts = 0;
+        int totalBurstSize = 0;
+        int maxChangeBurst = 0;
+        int burstSize = 0;
+
+        for(Integer point : changeBursts){
+            if(point == INDEX_END_BURST){
+                numberOfChangeBursts++;
+                totalBurstSize++;
+                burstSize++;
+                if(burstSize > maxChangeBurst){
+                    maxChangeBurst = burstSize;
+                }
+                burstSize = 0;
+            } else if(point == INDEX_START_BURST){
+                totalBurstSize++;
+                burstSize++;
+            } else if (point == INDEX_NORMAL_BURST){
+                totalBurstSize++;
+                burstSize++;
+            }
+        }
+
+        metrics.add(INDEX_NOCB, numberOfChangeBursts);
+        metrics.add(INDEX_TBS, totalBurstSize);
+        metrics.add(INDEX_MCB, maxChangeBurst);
+
+    }
+
+    private static void calculateTimeMetrics(List<Integer> changeBursts, List<Integer> metrics){
+        int timeFirstBurst = 0;
+        for(int index = 0; index < changeBursts.size(); index++){
+            if(changeBursts.get(index) == INDEX_START_BURST || changeBursts.get(index) == INDEX_END_BURST){
+                timeFirstBurst = index;
+                break;
+            }
+        }
+        metrics.add(INDEX_TFB, timeFirstBurst);
+
+        int timeLastBurst = 0;
+        boolean lastEndBurstFound = false;
+        for(int index = changeBursts.size() - 1; index >= 0; index--){
+            if(!lastEndBurstFound) {
+                if (changeBursts.get(index) == INDEX_END_BURST) {
+                    timeLastBurst = index;
+                    lastEndBurstFound = true;
+                }
+            } else {
+                if(changeBursts.get(index) == INDEX_END_BURST){
+                    break;
+                } else if (changeBursts.get(index) == INDEX_START_BURST){
+                    timeLastBurst = index;
+                    break;
+                }
+            }
+        }
+        metrics.add(INDEX_TLB, timeLastBurst);
+
+        int timeMaxBurst = 0;
+        int burstSize = 0;
+        int maxBurstSize = 0;
+        int firstStartBurst = 0;
+
+        for(int index = 0; index < changeBursts.size(); index++){
+            if(changeBursts.get(index) == INDEX_END_BURST){
+                burstSize++;
+                if(burstSize > maxBurstSize){
+                    maxBurstSize = burstSize;
+                    timeMaxBurst = firstStartBurst;
+                }
+                burstSize = 0;
+            } else if(changeBursts.get(index) == INDEX_START_BURST){
+                burstSize++;
+                firstStartBurst = index;
+            } else if (changeBursts.get(index) == INDEX_NORMAL_BURST){
+                burstSize++;
+            }
+        }
+        metrics.add(INDEX_TMB);
+    }
+
+    private static void changePeopleMetrics(List<Integer> changeBursts, List<Integer> metrics, Map<Integer, Commit> commits){
+        Set<String> allAuthors = new HashSet<>();
+        Set<String> allAuthorsInBursts = new HashSet<>();
+        Set<String> authorsInBurst = new HashSet<>();
+        int maxPeopleInBurst = 0;
+
+        for(int index = 0; index < changeBursts.size(); index++){
+            int point = changeBursts.get(index);
+
+            if(point == INDEX_START_BURST || point == INDEX_NORMAL_BURST || point == INDEX_END_BURST){
+                allAuthorsInBursts.add(commits.get(index).getAuthor());
+                allAuthors.add(commits.get(index).getAuthor());
+                authorsInBurst.add(commits.get(index).getAuthor());
+                if(point == INDEX_END_BURST){
+                    if(authorsInBurst.size() > maxPeopleInBurst){
+                        maxPeopleInBurst = authorsInBurst.size();
+                    }
+                    authorsInBurst.clear();
+                }
+            }
+            if(point == INDEX_NON_BURST_CHANGE){
+                allAuthors.add(commits.get(index).getAuthor());
+            }
+        }
+
+        metrics.add(INDEX_PT, allAuthors.size());
+        metrics.add(INDEX_TPIB, allAuthorsInBursts.size());
+        metrics.add(INDEX_MPIB, maxPeopleInBurst);
     }
 
 }
