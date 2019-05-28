@@ -38,17 +38,22 @@ public class MetricsExtractor {
     final static int INDEX_CT = 21;
     final static int INDEX_TCIB = 22;
     final static int INDEX_MCIB = 23;
+    final static int TOTAL_METRICS = 24;
 
     enum ProjectLife {
         Full, Early, Late;
     }
 
-    public static List<List<Integer>> extractMetrics(List<Boolean> changedSequence, Map<Integer, Commit> commits, Component component) {
+    public static void extractMetrics(Map<Integer, Commit> commits, Component component) {
+        List<Boolean> changedSequence = component.getChangeSequence();
         List<List<Integer>> metrics = new ArrayList<>();
-        int[] changeBurstsValues;
 
         for (int snapshot = 0; snapshot < TOTAL_SNAPSHOTS; snapshot++) {
             List<Integer> metricsOfSnapshot = new ArrayList<>();
+            for(int metricIndex = 0; metricIndex < TOTAL_METRICS; metricIndex++){
+                metricsOfSnapshot.add(metricIndex, 0);
+            }
+
             Map<Integer, Commit> commitsOfSnapshot = new HashMap<>();
             for (int index = snapshot * SNAPSHOT_GAP; index <= snapshot * SNAPSHOT_GAP + SNAPSHOT_GAP - 1; index++) {
                 commitsOfSnapshot.put(index - snapshot * SNAPSHOT_GAP, commits.get(index));
@@ -59,7 +64,7 @@ public class MetricsExtractor {
             calculateChangeMetrics(changeBursts, metricsOfSnapshot, ProjectLife.Full);
             calculateTimeMetrics(changeBursts, metricsOfSnapshot);
             calculatePeopleMetrics(changeBursts, metricsOfSnapshot, commitsOfSnapshot);
-            calculateChurnMetrics(changeBursts, metricsOfSnapshot, commits, component);
+            calculateChurnMetrics(changeBursts, metricsOfSnapshot, commitsOfSnapshot, component);
 
             int originalBurstSize = BURST_SIZE;
             BURST_SIZE = 1;
@@ -104,7 +109,7 @@ public class MetricsExtractor {
             metrics.add(snapshot, metricsOfSnapshot);
         }
 
-        return metrics;
+        component.setMetrics(metrics);
     }
 
     /*
@@ -127,7 +132,7 @@ public class MetricsExtractor {
 
             if (changedSequence.get(index) == TRUE) {
                 numberOfChanges++;
-                changeBursts.add(index - startIndex, INDEX_NON_BURST_CHANGE);
+                Utils.replace(changeBursts, index - startIndex, INDEX_NON_BURST_CHANGE);
                 lastChangedIndex = index;
 
                 if (!isBurst) {
@@ -139,7 +144,7 @@ public class MetricsExtractor {
                         assert tempBurst.empty();
                     }
                 } else {
-                    changeBursts.add(index - startIndex, INDEX_NORMAL_BURST);
+                    Utils.replace(changeBursts, index - startIndex, INDEX_NORMAL_BURST);
                 }
 
             } else {
@@ -149,7 +154,7 @@ public class MetricsExtractor {
                 if ((index - lastChangedIndex) == GAP_SIZE) {
                     changeCount = 0;
                     if (isBurst) {
-                        changeBursts.add(lastChangedIndex - startIndex, INDEX_END_BURST);
+                        Utils.replace(changeBursts, lastChangedIndex - startIndex, INDEX_END_BURST);
                     } else {
                         tempBurst.clear();
                     }
@@ -160,7 +165,7 @@ public class MetricsExtractor {
         }
 
         if (isBurst) {
-            changeBursts.add(lastChangedIndex - startIndex, INDEX_END_BURST);
+            Utils.replace(changeBursts, lastChangedIndex - startIndex, INDEX_END_BURST);
         }
 
         changeBursts.add(endIndex - startIndex + 1, numberOfChanges);
@@ -170,9 +175,9 @@ public class MetricsExtractor {
     private static void updateChangeBursts(List<Integer> changeBursts, Stack<Integer> tempBurst) {
         while (!tempBurst.empty()) {
             if (tempBurst.size() == 1) {
-                changeBursts.add(tempBurst.pop(), INDEX_START_BURST);
+                Utils.replace(changeBursts, tempBurst.pop(), INDEX_START_BURST);
             } else {
-                changeBursts.add(tempBurst.pop(), INDEX_NORMAL_BURST);
+                Utils.replace(changeBursts, tempBurst.pop(), INDEX_NORMAL_BURST);
             }
         }
     }
@@ -211,20 +216,20 @@ public class MetricsExtractor {
     private static void insertChangeMetrics(List<Integer> metrics, int numberOfChanges, int numberOfChangeBursts,
                                             int totalBurstSize, int maxChangeBurst, Enum projectLife) {
         if (projectLife == ProjectLife.Full) {
-            metrics.add(INDEX_NOC, numberOfChanges);
-            metrics.add(INDEX_NOCB, numberOfChangeBursts);
-            metrics.add(INDEX_TBS, totalBurstSize);
-            metrics.add(INDEX_MCB, maxChangeBurst);
+            Utils.replace(metrics, INDEX_NOC, numberOfChanges);
+            Utils.replace(metrics, INDEX_NOCB, numberOfChangeBursts);
+            Utils.replace(metrics, INDEX_TBS, totalBurstSize);
+            Utils.replace(metrics, INDEX_MCB, maxChangeBurst);
         } else if (projectLife == ProjectLife.Early) {
-            metrics.add(INDEX_NOCE, numberOfChanges);
-            metrics.add(INDEX_NOCBE, numberOfChangeBursts);
-            metrics.add(INDEX_TBSE, totalBurstSize);
-            metrics.add(INDEX_MCBE, maxChangeBurst);
+            Utils.replace(metrics, INDEX_NOCE, numberOfChanges);
+            Utils.replace(metrics, INDEX_NOCBE, numberOfChangeBursts);
+            Utils.replace(metrics, INDEX_TBSE, totalBurstSize);
+            Utils.replace(metrics, INDEX_MCBE, maxChangeBurst);
         } else if (projectLife == ProjectLife.Late) {
-            metrics.add(INDEX_NOCL, numberOfChanges);
-            metrics.add(INDEX_NOCBL, numberOfChangeBursts);
-            metrics.add(INDEX_TBSL, totalBurstSize);
-            metrics.add(INDEX_MCBL, maxChangeBurst);
+            Utils.replace(metrics, INDEX_NOCL, numberOfChanges);
+            Utils.replace(metrics, INDEX_NOCBL, numberOfChangeBursts);
+            Utils.replace(metrics, INDEX_TBSL, totalBurstSize);
+            Utils.replace(metrics, INDEX_MCBL, maxChangeBurst);
         }
     }
 
@@ -236,7 +241,7 @@ public class MetricsExtractor {
                 break;
             }
         }
-        metrics.add(INDEX_TFB, timeFirstBurst);
+        Utils.replace(metrics, INDEX_TFB, timeFirstBurst);
 
         int timeLastBurst = 0;
         boolean lastEndBurstFound = false;
@@ -255,7 +260,7 @@ public class MetricsExtractor {
                 }
             }
         }
-        metrics.add(INDEX_TLB, timeLastBurst);
+        Utils.replace(metrics, INDEX_TLB, timeLastBurst);
 
         int timeMaxBurst = 0;
         int burstSize = 0;
@@ -277,7 +282,7 @@ public class MetricsExtractor {
                 burstSize++;
             }
         }
-        metrics.add(INDEX_TMB);
+        Utils.replace(metrics, INDEX_TMB, timeMaxBurst);
     }
 
     private static void calculatePeopleMetrics(List<Integer> changeBursts, List<Integer> metrics, Map<Integer, Commit> commits) {
@@ -305,9 +310,9 @@ public class MetricsExtractor {
             }
         }
 
-        metrics.add(INDEX_PT, allAuthors.size());
-        metrics.add(INDEX_TPIB, allAuthorsInBursts.size());
-        metrics.add(INDEX_MPIB, maxPeopleInBurst);
+        Utils.replace(metrics, INDEX_PT, allAuthors.size());
+        Utils.replace(metrics, INDEX_TPIB, allAuthorsInBursts.size());
+        Utils.replace(metrics, INDEX_MPIB, maxPeopleInBurst);
     }
 
     private static void calculateChurnMetrics(List<Integer> changeBursts, List<Integer> metrics,
@@ -335,9 +340,9 @@ public class MetricsExtractor {
             }
         }
 
-        metrics.add(INDEX_CT, totalChurn);
-        metrics.add(INDEX_TCIB, totalChurnInBurst);
-        metrics.add(INDEX_MCIB, maxChurnInBurst);
+        Utils.replace(metrics, INDEX_CT, totalChurn);
+        Utils.replace(metrics, INDEX_TCIB, totalChurnInBurst);
+        Utils.replace(metrics, INDEX_MCIB, maxChurnInBurst);
 
     }
 
@@ -350,17 +355,16 @@ public class MetricsExtractor {
         }
 
         insertConsecutiveChangeMetrics(metrics, numberOfConsecutiveChanges, projectLife);
-        metrics.add(INDEX_NOCC, numberOfConsecutiveChanges);
     }
 
     private static void insertConsecutiveChangeMetrics(List<Integer> metrics, int numberOfConsecutiveChanges,
                                                        ProjectLife projectLife) {
         if (projectLife == ProjectLife.Full) {
-            metrics.add(INDEX_NOCC, numberOfConsecutiveChanges);
+            Utils.replace(metrics, INDEX_NOCC, numberOfConsecutiveChanges);
         } else if (projectLife == ProjectLife.Early) {
-            metrics.add(INDEX_NOCCE, numberOfConsecutiveChanges);
+            Utils.replace(metrics, INDEX_NOCCE, numberOfConsecutiveChanges);
         } else if (projectLife == ProjectLife.Late) {
-            metrics.add(INDEX_NOCCL, numberOfConsecutiveChanges);
+            Utils.replace(metrics, INDEX_NOCCL, numberOfConsecutiveChanges);
         }
     }
 

@@ -26,8 +26,19 @@ public class DataCollector {
         importCommitAuthors();
         fillChangeSequences();
 
-        printAllComponents();
+        for(Component component : components.values()){
+            MetricsExtractor.extractMetrics(commits, component);
+        }
+        printMetricsForComponent("org/apache/commons/lang3/math/NumberUtils");
+        //printAllComponents();
         //printAllCommits();
+    }
+
+    private static void printMetricsForComponent(String compName) {
+        if(!components.containsKey(compName)){
+            throw new RuntimeException("Component Name is not found. Name: " + compName);
+        }
+        System.out.println(components.get(compName).metricsToString());
     }
 
     private static void importCommitStats() {
