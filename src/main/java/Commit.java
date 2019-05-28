@@ -3,6 +3,7 @@ import javafx.util.Pair;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class Commit {
     private int commitIndex;
@@ -39,5 +40,9 @@ public class Commit {
 
     public String getAuthor(){
         return author;
+    }
+
+    public Set<Component> getChangedComponents(){
+        return changedComponents.keySet();
     }
 }

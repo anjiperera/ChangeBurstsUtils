@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 public class DataCollector {
+    final static int TOTAL_COMMITS = 5447;
     final static int INDEX_COMMIT_INDEX = 0;
     final static int INDEX_COMMIT_ID = 1;
     final static int INDEX_CLASS_NAME = 2;
@@ -23,9 +24,10 @@ public class DataCollector {
         components = new HashMap<String, Component>();
         importCommitStats();
         importCommitAuthors();
+        fillChangeSequences();
 
-        //printAllComponents();
-        printAllCommits();
+        printAllComponents();
+        //printAllCommits();
     }
 
     private static void importCommitStats() {
@@ -126,9 +128,17 @@ public class DataCollector {
         }
     }
 
+    private static void  fillChangeSequences(){
+        for(Commit commit : commits.values()){
+            for(Component component : commit.getChangedComponents()){
+                component.changedAt(commit.getCommitIndex());
+            }
+        }
+    }
+
     private static void printAllComponents() {
         for (Component component : components.values()) {
-            System.out.println(component.getName());
+            System.out.println(component.toString());
         }
     }
 
