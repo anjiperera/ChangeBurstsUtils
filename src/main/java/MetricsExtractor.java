@@ -40,23 +40,28 @@ public class MetricsExtractor {
     final static int INDEX_TCIB = 22;
     final static int INDEX_MCIB = 23;
 
-    public static List<List<Integer>> extractMetrics(List<Boolean> changedSequence){
+    public static List<List<Integer>> extractMetrics(List<Boolean> changedSequence, Map<Integer, Commit> commits, Component component){
         List<List<Integer>> metrics = new ArrayList<>();
         int[] changeBurstsValues;
 
         for(int snapshot = 0; snapshot < TOTAL_SNAPSHOTS; snapshot++){
             List<Integer> metricsOfSnapshot = new ArrayList<>();
+            Map<Integer, Commit> commitsOfSnapshot = new HashMap<>();
+            for(int index = snapshot*SNAPSHOT_GAP; index <= snapshot*SNAPSHOT_GAP + SNAPSHOT_GAP - 1; index++){
+                    commitsOfSnapshot.put(index - snapshot*SNAPSHOT_GAP, commits.get(index));
+            }
 
             List<Integer> changeBursts = getChangeBursts(changedSequence, snapshot*SNAPSHOT_GAP,
                     snapshot*SNAPSHOT_GAP + SNAPSHOT_GAP - 1);
             calculateChangeMetrics(changeBursts, metricsOfSnapshot);
             calculateTimeMetrics(changeBursts, metricsOfSnapshot);
-
+            calculatePeopleMetrics(changeBursts, metricsOfSnapshot, commitsOfSnapshot);
+            calculateChurnMetrics(changeBursts, metricsOfSnapshot, commits, component);
 
             int originalBurstSize = BURST_SIZE;
-
             BURST_SIZE = 1;
 
+            
             changeBurstsValues = calculateChangeBursts(changedSequence, snapshot*SNAPSHOT_GAP,
                     snapshot*SNAPSHOT_GAP + SNAPSHOT_GAP - 1);
 
@@ -316,7 +321,7 @@ public class MetricsExtractor {
         metrics.add(INDEX_TMB);
     }
 
-    private static void changePeopleMetrics(List<Integer> changeBursts, List<Integer> metrics, Map<Integer, Commit> commits){
+    private static void calculatePeopleMetrics(List<Integer> changeBursts, List<Integer> metrics, Map<Integer, Commit> commits){
         Set<String> allAuthors = new HashSet<>();
         Set<String> allAuthorsInBursts = new HashSet<>();
         Set<String> authorsInBurst = new HashSet<>();
@@ -344,6 +349,37 @@ public class MetricsExtractor {
         metrics.add(INDEX_PT, allAuthors.size());
         metrics.add(INDEX_TPIB, allAuthorsInBursts.size());
         metrics.add(INDEX_MPIB, maxPeopleInBurst);
+    }
+
+    private static void calculateChurnMetrics(List<Integer> changeBursts, List<Integer> metrics,
+                                              Map<Integer, Commit> commits, Component component){
+        int totalChurn = 0;
+        int totalChurnInBurst = 0;
+        int churnInBurst = 0;
+        int maxChurnInBurst = 0;
+
+        for(int index = 0; index < changeBursts.size(); index++){
+            int point = changeBursts.get(index);
+
+            if(point == INDEX_START_BURST || point == INDEX_NORMAL_BURST || point == INDEX_END_BURST){
+                totalChurnInBurst += commits.get(index).getNumberOfChangedLines(component);
+                totalChurn += commits.get(index).getNumberOfChangedLines(component);
+                churnInBurst += commits.get(index).getNumberOfChangedLines(component);
+                if(point == INDEX_END_BURST){
+                    if(churnInBurst > maxChurnInBurst){
+                        maxChurnInBurst = churnInBurst;
+                    }
+                }
+            }
+            if(point == INDEX_NON_BURST_CHANGE){
+                totalChurn += commits.get(index).getNumberOfChangedLines(component);
+            }
+        }
+
+        metrics.add(INDEX_CT, totalChurn);
+        metrics.add(INDEX_TCIB, totalChurnInBurst);
+        metrics.add(INDEX_MCIB, maxChurnInBurst);
+
     }
 
 }

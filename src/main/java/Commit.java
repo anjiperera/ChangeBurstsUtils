@@ -45,4 +45,8 @@ public class Commit {
     public Set<Component> getChangedComponents(){
         return changedComponents.keySet();
     }
+
+    public int getNumberOfChangedLines(Component component){
+        return changedComponents.get(component);
+    }
 }
