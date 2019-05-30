@@ -32,6 +32,30 @@ public class Component {
         return changeSequence;
     }
 
+    public List<Integer> getMetrics(int snapshot){
+        return metrics.get(snapshot);
+    }
+
+    public int getFirstChangedIndex(){
+        for(int index = 0; index < changeSequence.size(); index++){
+            if(changeSequence.get(index) == Boolean.TRUE){
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    public int getLastChangedIndex(){
+        for(int index = changeSequence.size() - 1; index >= 0; index--){
+            if(changeSequence.get(index) == Boolean.TRUE){
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
     @Override
     public String toString(){
         String component = compName + " : ";

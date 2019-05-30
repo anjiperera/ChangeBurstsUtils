@@ -1,6 +1,10 @@
 import com.opencsv.CSVReader;
+import com.opencsv.CSVWriter;
 
+import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,9 +33,63 @@ public class DataCollector {
         for(Component component : components.values()){
             MetricsExtractor.extractMetrics(commits, component);
         }
-        printMetricsForComponent("org/apache/commons/lang3/math/NumberUtils");
+
+        printFirstAndLastChangedIndices("org/apache/commons/lang3/math/NumberUtils");
+        printFirstAndLastChangedIndices("org/apache/commons/lang/NumberUtils");
+        printFirstAndLastChangedIndices("org/apache/commons/lang/math/NumberUtils");
+
+        //writeMetrics("C:\\Research\\Defects4J_Projects\\Utils\\lang\\metrics_snapshot", getAllTheChangedComponents(4), 4);
+        //printMetricsForComponent("org/apache/commons/lang3/math/NumberUtils");
         //printAllComponents();
         //printAllCommits();
+    }
+
+    private static void printFirstAndLastChangedIndices(String componentName) {
+        String output = componentName + " : First Change Index: " + components.get(componentName).getFirstChangedIndex()
+                + ", Last Change Index: " + components.get(componentName).getLastChangedIndex();
+        System.out.println(output);
+    }
+
+    private static List<Component> getAllTheChangedComponents(int snapshot) {
+        List<Component> changedComponents = new ArrayList<>();
+        for(Component component : components.values()){
+            if(component.getMetrics(snapshot).get(MetricsExtractor.INDEX_NOC) > 0){
+                changedComponents.add(component);
+            }
+        }
+
+        return changedComponents;
+    }
+
+    private static void writeMetrics(String filePath, List<Component> components, int snapshot){
+        filePath = filePath + "_" + snapshot + ".csv";
+        File file = new File(filePath);
+        try {
+            FileWriter outputFile = new FileWriter(file);
+
+            CSVWriter writer = new CSVWriter(outputFile);
+
+            String[] header = { "Component", "NOC", "NOCC", "NOCB", "TBS", "MCB", "NOCE", "NOCCE", "NOCBE", "TBSE", "MCBE",
+            "NOCL", "NOCCL", "NOCBL", "TBSL", "MCBL", "TFB", "TLB", "TMB", "PT", "TPIB", "MPIB", "CT", "TCIB", "MCIB"};
+            writer.writeNext(header);
+
+            String[] row = new String[25];
+
+            for(Component component : components){
+                row[0] = component.getName();
+                int metricIndex = 1;
+                for(Integer metric : component.getMetrics(snapshot)){
+                    row[metricIndex] = metric.toString();
+                    metricIndex++;
+                }
+                writer.writeNext(row);
+            }
+
+            writer.close();
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private static void printMetricsForComponent(String compName) {
