@@ -40,10 +40,42 @@ public class DataCollector {
         //printFirstAndLastChangedIndices("org/apache/commons/lang/math/NumberUtils");
 
         //System.out.println(getAllTheChangedComponents(4).size());
-        //writeMetrics("C:\\Research\\Defects4J_Projects\\Utils\\lang\\metrics_snapshot", getAllTheChangedComponents(4), 4);
+        writeMetrics("C:\\Research\\Defects4J_Projects\\Utils\\lang\\test1_metrics_gap3_burst1_snapshot", getAllTheChangedComponents(0), 0);
         //printMetricsForComponent("org/apache/commons/lang3/math/NumberUtils");
         //printAllComponents();
         //printAllCommits();
+        //writeChangeSequence("C:\\Research\\Defects4J_Projects\\Utils\\lang\\change_sequence_snapshot", getAllTheChangedComponents(0), 0);
+        //writeChangeCommitIds("C:\\Research\\Defects4J_Projects\\Utils\\lang\\change_commitIds_snapshot", getAllTheChangedComponents(0), 0);
+    }
+
+    private static void writeChangeCommitIds(String filePath, List<Component> components, int snapshot) {
+        filePath = filePath + "_" + snapshot + ".csv";
+        File file = new File(filePath);
+        try {
+            FileWriter outputFile = new FileWriter(file);
+
+            CSVWriter writer = new CSVWriter(outputFile);
+
+            for(Component component : components){
+                String[] row = new String[MetricsExtractor.SNAPSHOT_GAP + 1];
+                row[0] = component.getName();
+                int nextIndex = 1;
+                List<Boolean> changeSequence = component.getChangeSequence();
+                for(int commitIndex = snapshot*MetricsExtractor.SNAPSHOT_GAP; commitIndex < (snapshot+1)*MetricsExtractor.SNAPSHOT_GAP;
+                    commitIndex++){
+                    if(changeSequence.get(commitIndex).equals(Boolean.TRUE)){
+                        row[nextIndex] = commits.get(commitIndex).getCommitId();
+                        nextIndex++;
+                    }
+                }
+                writer.writeNext(row);
+            }
+
+            writer.close();
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private static void printFirstAndLastChangedIndices(String componentName) {
@@ -63,6 +95,32 @@ public class DataCollector {
         return changedComponents;
     }
 
+    private static void writeChangeSequence(String filePath, List<Component> components, int snapshot){
+        filePath = filePath + "_" + snapshot + ".csv";
+        File file = new File(filePath);
+        try {
+            FileWriter outputFile = new FileWriter(file);
+
+            CSVWriter writer = new CSVWriter(outputFile);
+            String[] row = new String[MetricsExtractor.SNAPSHOT_GAP + 1];
+
+            for(Component component : components){
+                row[0] = component.getName();
+                List<Boolean> changeSequence = component.getChangeSequence();
+                for(int commitIndex = snapshot*MetricsExtractor.SNAPSHOT_GAP; commitIndex < (snapshot+1)*MetricsExtractor.SNAPSHOT_GAP;
+                    commitIndex++){
+                    row[commitIndex - snapshot*MetricsExtractor.SNAPSHOT_GAP + 1] = changeSequence.get(commitIndex).equals(Boolean.TRUE) ? "1" : "0";
+                }
+                writer.writeNext(row);
+            }
+
+            writer.close();
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     private static void writeMetrics(String filePath, List<Component> components, int snapshot){
         filePath = filePath + "_" + snapshot + ".csv";
         File file = new File(filePath);
@@ -71,8 +129,12 @@ public class DataCollector {
 
             CSVWriter writer = new CSVWriter(outputFile);
 
-            String[] header = { "Component", "NOC", "NOCC", "NOCB", "TBS", "MCB", "NOCE", "NOCCE", "NOCBE", "TBSE", "MCBE",
-            "NOCL", "NOCCL", "NOCBL", "TBSL", "MCBL", "TFB", "TLB", "TMB", "PT", "TPIB", "MPIB", "CT", "TCIB", "MCIB"};
+            String[] header = { "Component", "NumberOfChanges", "NumberConsecutiveChanges", "NumberCodeBursts", "TotalBurstSize",
+                    "MaximumCodeBurst", "NumberOfChangesEarly", "NumberOfConsecutiveChangesEarly", "NumberCodeBurstsEarly",
+                    "TotalBurstSizeEarly", "MaximumCodeBurstEarly", "NumberOfChangesLate", "NumberConsecutiveChangesLate",
+                    "NumberCodeBurstsLate", "TotalBurstSizeLate", "MaximumCodeBurstLate", "TimeFirstBurst", "TimeLastBurst",
+                    "TimeMaxBurst", "PeopleTotal", "TotalPeopleInBurst", "MaxPeopleInBurst", "ChurnTotal", "TotalChurnInBurst",
+                    "MaxChurnInBurst"};
             writer.writeNext(header);
 
             String[] row = new String[25];

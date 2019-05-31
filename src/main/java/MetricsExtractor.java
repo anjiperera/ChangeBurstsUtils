@@ -9,7 +9,7 @@ public class MetricsExtractor {
     private static final Integer INDEX_START_BURST = 2;
     private static final Integer INDEX_END_BURST = 3;
     private static final Integer INDEX_NON_BURST_CHANGE = 4;
-    public static int GAP_SIZE = 1;
+    public static int GAP_SIZE = 3;
     public static int BURST_SIZE = 1;
     public static int SNAPSHOT_GAP = 450;
     public static int TOTAL_SNAPSHOTS = 9;
@@ -265,14 +265,18 @@ public class MetricsExtractor {
         int timeMaxBurst = 0;
         int burstSize = 0;
         int maxBurstSize = 0;
-        int firstStartBurst = 0;
+        int firstStartBurst = -1;
 
         for (int index = 0; index < changeBursts.size(); index++) {
             if (changeBursts.get(index) == INDEX_END_BURST) {
                 burstSize++;
                 if (burstSize > maxBurstSize) {
                     maxBurstSize = burstSize;
-                    timeMaxBurst = firstStartBurst;
+                    if(firstStartBurst > -1) {
+                        timeMaxBurst = firstStartBurst;
+                    } else {
+                        timeMaxBurst = index;
+                    }
                 }
                 burstSize = 0;
             } else if (changeBursts.get(index) == INDEX_START_BURST) {
@@ -333,6 +337,7 @@ public class MetricsExtractor {
                     if (churnInBurst > maxChurnInBurst) {
                         maxChurnInBurst = churnInBurst;
                     }
+                    churnInBurst = 0;
                 }
             }
             if (point == INDEX_NON_BURST_CHANGE) {
